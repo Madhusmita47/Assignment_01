@@ -11,8 +11,13 @@
   "dependencies": {
     "aws-sdk": "^2.1594.0",
     "cors": "^2.8.5",
+    "csv-parser": "^3.0.0",
+    "csvtojson": "^2.0.10",
     "express": "^4.19.2",
+    "fs": "^0.0.1-security",
     "mongoose": "^8.3.0",
-    "nodemon": "^3.1.0"
+    "multer": "^1.4.5-lts.1",
+    "nodemon": "^3.1.0",
+    "path": "^0.12.7"
   }
 }

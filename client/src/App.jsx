@@ -1,12 +1,12 @@
 import Dashboard from "./components/Dashboard";
-import Navbar from "./components/Navbar";
+import Chart from "./components/Chart"
 
 
 const App = () => {
   return (
     <div>
-      <Navbar/>
-     <Dashboard/>
+      <Dashboard/>
+      <Chart/>
     </div>
   );
 }

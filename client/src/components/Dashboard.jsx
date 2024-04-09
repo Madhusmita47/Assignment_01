@@ -1,5 +1,5 @@
 
-import { useState} from "react";
+import { useState,useEffect} from "react";
 
 const Dashboard = () => {
       const [domain, setDomain] = useState("");
@@ -7,23 +7,23 @@ const Dashboard = () => {
       const [recordData, setRecordData] = useState("");
     const [records, setRecords] = useState([]);
         
+//--------------------------search function-----------------------------------
+const fetchDnsRecords = async () => {
+  try {
+    const response = await fetch(`http://localhost:3000/dns/records/${domain}`);
 
-// const fetchDnsRecords = async () => {
-//   try {
-//     const response = await fetch(`http://localhost:3000/dns/records/${domain}`);
+    const data = await response.json();
+       setRecords(data.data);
 
-//     const data = await response.json();
-//        setRecords(data.data);
+  } catch (error) {
+    console.error(error.message);
+  }
+};
 
-//   } catch (error) {
-//     console.error(error.message);
-//   }
-// };
-
-// useEffect(() => {
-//   fetchDnsRecords();
-// }, [domain]);
-
+useEffect(() => {
+  fetchDnsRecords();
+}, [domain]);
+//--------------------------------------------------------------------------------------
 const addRecord = async (e) => {
   e.preventDefault();
   try {
@@ -40,11 +40,8 @@ const addRecord = async (e) => {
     });
     const data = await response.json();
     console.log("data", data);
-    if (!response.ok) {
-      throw new Error(`Failed to add DNS record: ${response.statusText}`);
-      }
        setRecords((prevRecords) => [...prevRecords, data.data]);
-    // fetchDnsRecords(); 
+    fetchDnsRecords(); 
     setDomain("");
     setRecordType("");
     setRecordData("");
@@ -95,6 +92,33 @@ const addRecord = async (e) => {
             console.error(error.message);
         }
     }
+//-------------------------------------------------------------------------------
+  const handelUploadfile = async (e) => {
+   e.preventDefault();
+
+    const fileInput = document.getElementById("fileInput");
+    const file = fileInput.files[0];
+
+    if (file) {
+      const formData = new FormData();
+      formData.append("file", file);
+      console.log("formdata", formData);
+
+      try {
+        const data = await fetch(`http://localhost:3000/fileupload`, {
+          method: "POST",
+          body: formData,
+          mode: "cors",
+        });
+
+        const result = await data.json();
+        console.log("result", result);
+       
+      } catch (error) {
+        console.error("Error during fetch:", error);
+      }
+    }
+}
 
 
     
@@ -125,7 +149,14 @@ const addRecord = async (e) => {
           required
         />
         <button type="submit">Add Record</button>
-        <button type="submit">Upload file</button>
+        <input
+          type="file"
+          id="fileInput"
+          placeholder ="select file to upload"
+          style={{ padding: "3px", fontSize: "20px" }}
+          onChange={handelUploadfile}
+        />
+        {/* <button type="submit" onClick={handelUploadfile}>Upload file</button>  */}
       </form>
 
       {records.length === 0 ? (
