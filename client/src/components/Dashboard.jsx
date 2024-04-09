@@ -124,6 +124,33 @@ const Dashboard = () => {
       alert('Please select an item from the record type dropdown.');
       return;
     }
+//-------------------------------------------------------------------------------
+  const handelUploadfile = async (e) => {
+   e.preventDefault();
+
+    const fileInput = document.getElementById("fileInput");
+    const file = fileInput.files[0];
+
+    if (file) {
+      const formData = new FormData();
+      formData.append("file", file);
+      console.log("formdata", formData);
+
+      try {
+        const data = await fetch(`http://localhost:3000/fileupload`, {
+          method: "POST",
+          body: formData,
+          mode: "cors",
+        });
+
+        const result = await data.json();
+        console.log("result", result);
+       
+      } catch (error) {
+        console.error("Error during fetch:", error);
+      }
+    }
+}
 
   };
 
