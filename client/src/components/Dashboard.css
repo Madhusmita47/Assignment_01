@@ -66,3 +66,16 @@
     align-items: center;
     height: 20rem;
 }
+
+/* .custom-line-style {
+    line-height: 3rem;
+    word-break: break-all;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+} */
+
+.line-height {
+    line-height: 3rem;
+}

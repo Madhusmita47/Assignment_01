@@ -10,18 +10,18 @@ app.use(express.json());
 
 mongoose.connect("mongodb+srv://madhusmita_123:5fiVrKsOKBIGJsKe@cluster0.cpbhduk.mongodb.net/Assignment")
     .then(() => console.log("Mongodb is Connected"))
-    .catch((err) => console.log("Error Connecting to Mongodb",err))
+    .catch((err) => console.log("Error Connecting to Mongodb", err))
 
 const PORT = 3000
 app.listen(PORT, () => {
     console.log(`Server is running  on port ${PORT}`);
 })
 
-const DnsRecord = require ("./model/dnsModel")
+const DnsRecord = require("./model/dnsModel")
 const validateRecordType = require("./validation/validation")
 // CRUD operations
 
-app.post('/dns/record',validateRecordType, async (req, res) => {
+app.post('/dns/record', validateRecordType, async (req, res) => {
     const { domain, recordType, recordData } = req.body;
 
     try {
@@ -73,22 +73,22 @@ app.delete('/dns/record/:id', async (req, res) => {
 
     try {
         await DnsRecord.findByIdAndDelete(id);
-        res.status(200).json({ success: true,message:"Deleted Successfull" });
+        res.status(200).json({ success: true, message: "Deleted Successfull" });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
 });
 
 //------------------------------------------------------------------------------
-const multer=require("multer")
+const multer = require("multer")
 const csv = require("csv-parser");
 const fs = require("fs");
 var storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null,'./upload')
+        cb(null, './upload')
     },
     filename: (req, file, cb) => {
-        cb(null,file.originalname)
+        cb(null, file.originalname)
     }
 })
 var upload = multer({ storage: storage })
@@ -112,7 +112,7 @@ app.post('/fileupload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ success: false, message: "No file uploaded" });
         }
         const file = req.file.path;
-        console.log("file",file)
+        console.log("file", file)
         const userData = [];
         let error = []
         fs.createReadStream(req.file.path)
@@ -136,7 +136,7 @@ app.post('/fileupload', upload.single('file'), async (req, res) => {
                     recordData: row.recordData
                 });
             })
-            
+
             .on('end', async () => {
                 // Insert userData into the database after processing all rows
                 try {
@@ -144,7 +144,7 @@ app.post('/fileupload', upload.single('file'), async (req, res) => {
                     if (error.length > 0) {
                         return res.status(400).send({ status: true, message: "Some error found in csv file" });
                     } else {
-                         return  res.status(200).send({ status: true, message: "CSV imported successfully" });
+                        return res.status(200).send({ status: true, message: "CSV imported successfully" });
                     }
                 } catch (error) {
                     console.error("Error inserting data into database:", error);
@@ -157,6 +157,26 @@ app.post('/fileupload', upload.single('file'), async (req, res) => {
     } catch (error) {
         console.error("Error handling file upload:", error);
         res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+
+app.get('/aggregatedata', async (req, res) => {
+
+    try {
+        const aggregaterecordscounts = await DnsRecord.aggregate([{ $group: { _id: "$recordType", total_count: { $sum: 1 } } }])
+
+        const totalCount = aggregaterecordscounts.reduce((acc, curr) => acc + curr.total_count, 0);
+      
+        const totalpercentage = aggregaterecordscounts.map(record => ({
+            _id: record._id,
+            total_count: record.total_count,
+            percentage: ((record.total_count / totalCount) * 100).toFixed(2)
+        }));
+      
+        res.status(200).json({ success: true, count: aggregaterecordscounts, percentage: totalpercentage });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
