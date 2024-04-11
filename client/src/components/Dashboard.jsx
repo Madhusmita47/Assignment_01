@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Navbar, Nav, Table, Button, Modal, Dropdown, Form } from 'react-bootstrap';
+import { Navbar, Nav, Table, Button, Modal, Dropdown, Form, InputGroup, FormControl } from 'react-bootstrap';
 import { PencilSquare, Transparency, Trash, Download } from 'react-bootstrap-icons';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './Dashboard.css';
@@ -8,7 +8,20 @@ import { Chart as ChartJS } from 'chart.js/auto';
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 // import { DNS_Record_Template } from "../DNS_Record_Template.csv";
 const BaseURl = import.meta.env.VITE_API_KEY;
+import { BsSearch, BsX } from 'react-icons/bs';
+import { toast } from 'react-toastify';
 
+
+const toastStyle = {
+  position: "top-right",
+  autoClose: 4000,
+  hideProgressBar: false,
+  closeOnClick: true,
+  pauseOnHover: true,
+  draggable: true,
+  progress: undefined,
+  theme: "light",
+}
 
 const Dashboard = () => {
   const [domain, setDomain] = useState("");
@@ -27,6 +40,7 @@ const Dashboard = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEditDataModal, setShowEditDataModal] = useState({});
+  const [droppedFile, setDroppedFile] = useState(null);
 
   const handleClose = (data) => {
     if (data === "upload") setShowUploadModal(false);
@@ -43,25 +57,45 @@ const Dashboard = () => {
   };
 
 
+  const [selectedOption, setSelectedOption] = useState("");
+  const [search, setSearch] = useState("");
+
+  const handleDropdownSelect = (option) => {
+    setSelectedOption(option);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
+  };
+
+  const handleReset = () => {
+    setSelectedOption("");
+    setSearch("");
+  };
+
+  useEffect(() => {
+    fetchRecords();
+  }, [selectedOption, search])
+
   const fetchChat = async () => {
     try {
       const response = await fetch(`${BaseURl}/aggregatedata`);
       const data = await response.json();
 
       const chat1 = {};
-      chat1.labels = Object.values(data.count).map((item, i) => (
+      chat1.labels = Object.values(data.count).map((item) => (
         item['_id']
       ));
-      chat1.data = Object.values(data.count).map((item, i) => (
+      chat1.data = Object.values(data.count).map((item) => (
         parseInt(item['total_count'])
       ));
       setChatRecord(chat1);
 
       const chat2 = {};
-      chat2.labels = Object.values(data.percentage).map((item, i) => (
+      chat2.labels = Object.values(data.percentage).map((item) => (
         item['_id']
       ));
-      chat2.data = Object.values(data.percentage).map((item, i) => (
+      chat2.data = Object.values(data.percentage).map((item) => (
         parseFloat(item['percentage'])
       ));
 
@@ -74,10 +108,11 @@ const Dashboard = () => {
 
   const fetchRecords = async () => {
     try {
-      const response = await fetch(`${BaseURl}/dns/getallrecords`);
+      const response = await fetch(`${BaseURl}/dns/getallrecords?domain=${search}&recordType=${selectedOption}`);
       const data = await response.json();
       setRecords(data.data);
       fetchChat();
+
     } catch (error) {
       console.error("Error fetching records:", error);
     }
@@ -87,7 +122,7 @@ const Dashboard = () => {
   const addRecord = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${BaseURl}/dns/record`, {
+      let res = await fetch(`${BaseURl}/dns/record`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -99,27 +134,30 @@ const Dashboard = () => {
         }),
       });
 
-      await response.json();
+      res = await res.json();
 
       setDomain("");
       setRecordType("");
       setRecordData("");
       fetchRecords();
       handleClose('add');
+      toast(res?.message, toastStyle);
     } catch (error) {
-      console.error(error.message);
+      toast('There was some errors', toastStyle);
     }
   };
 
   const deleteRecord = async (id) => {
 
     try {
-      await fetch(`${BaseURl}/dns/record/${id}`, {
+      let res = await fetch(`${BaseURl}/dns/record/${id}`, {
         method: "DELETE",
       });
       fetchRecords();
+      res = await res.json();
+      toast(res?.message, toastStyle);
     } catch (error) {
-      console.error(error.message);
+      toast('There was some errors', toastStyle);
     }
   };
 
@@ -129,18 +167,19 @@ const Dashboard = () => {
     const id = showEditDataModal['_id'];
 
     try {
-      await fetch(`${BaseURl}/dns/record/${id}`, {
+      let res = await fetch(`${BaseURl}/dns/record/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(showEditDataModal),
       });
-
+      res = await res.json();
       fetchRecords();
       handleClose('edit');
+      toast(res?.message, toastStyle);
     } catch (error) {
-      console.error(error.message);
+      toast('There was some errors', toastStyle);
     }
   }
 
@@ -159,44 +198,35 @@ const Dashboard = () => {
     item.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  // const handleSubmit = (e) => {
-  //   e.preventDefault();
 
-  //   if (!selectedItem) {
-  //     alert('Please select an item from the record type dropdown.');
-  //     return;
-  //   }
-  //   //-------------------------------------------------------------------------------
-  //   const handelUploadfile = async (e) => {
-  //     e.preventDefault();
+  const handelUploadfile = async (e) => {
+    e.preventDefault();
 
-  //     const fileInput = document.getElementById("fileInput");
-  //     const file = fileInput.files[0];
+    if (!droppedFile) {
+      alert('Please select valid CSV file.');
+      return;
+    }
 
-  //     if (file) {
-  //       const formData = new FormData();
-  //       formData.append("file", file);
-  //       console.log("formdata", formData);
+    try {
+      const formData = new FormData();
+      formData.append("file", droppedFile);
 
-  //       try {
-  //         const data = await fetch(`http://localhost:3000/fileupload`, {
-  //           method: "POST",
-  //           body: formData,
-  //           mode: "cors",
-  //         });
+      let res = await fetch(`${BaseURl}/fileupload`, {
+        method: "POST",
+        body: formData,
+        mode: "cors",
+      });
+      res = await res.json();
 
-  //         const result = await data.json();
-  //         console.log("result", result);
+      fetchRecords();
+      handleClose('upload');
+      toast(res?.message, toastStyle);
+    } catch (error) {
+      toast('There was some errors', toastStyle);
+    }
+  }
 
-  //       } catch (error) {
-  //         console.error("Error during fetch:", error);
-  //       }
-  //     }
-  //   }
 
-  // };
-
-  const [droppedFile, setDroppedFile] = useState(null);
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -208,16 +238,13 @@ const Dashboard = () => {
     }
   };
 
-  const handleFiles = (files) => {
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
     const csvFile = files.find(file => file.name.endsWith('.csv'));
     if (csvFile) {
       setDroppedFile(csvFile);
     }
-  };
-
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files);
-    handleFiles(files);
   };
 
 
@@ -317,6 +344,7 @@ const Dashboard = () => {
             </Button>
 
             <Button type="submit" variant="warning"
+              onClick={handelUploadfile}
               style={{ width: '80px', textAlign: "center" }}>
               Upload
             </Button>
@@ -486,11 +514,29 @@ const Dashboard = () => {
                   label: "DNS Counts",
                   data: chatRecord.data,
                   backgroundColor: [
-                    "#0d6efd", "#ffc107", "#fd7e14", "#198754", "#dc3545", "#0dcaf0", "#58151c", "#6610f2"
+                    "#0d6efdd9", "#ffc107de", "#fd7e14d6", "#198754de", "#055160db", "#dc3545de", "#0dcaf0db", "#58151cde", "#6f42c1d6", '#664d03db'
                   ],
                   borderRadius: 5
+                },
+                {
+                  label: "Line Data",
+                  data: chatRecord.data,
+                  type: 'line',
+                  borderColor: '#664d03',
+                  fill: false,
+                  tension: 0.4,
+                  borderWidth: 1.5,
+                  backgroundColor: 'rgba(0, 0, 0, 0)',
+                  cubicInterpolationMode: 'monotone'
                 }
               ]
+            }}
+            options={{
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                },
+              }
             }}
           />
         </div>
@@ -504,7 +550,7 @@ const Dashboard = () => {
                   label: "DNS Percentage",
                   data: chatRecord2.data,
                   backgroundColor: [
-                    "#0d6efd", "#ffc107", "#fd7e14", "#198754", "#dc3545", "#0dcaf0", "#58151c", "#6610f2"
+                    "#0d6efdd9", "#ffc107de", "#fd7e14d6", "#198754de", "#055160db", "#dc3545de", "#0dcaf0db", "#58151cde", "#6f42c1d6", '#664d03db'
                   ],
                 }
               ]
@@ -517,36 +563,76 @@ const Dashboard = () => {
 
 
 
-      <div className="dataCard mt-3" style={{ width: '95%', margin: 'auto', maxHeight: '600px', overflow: "auto" }}>
+      <div className="dataCard mt-3" style={{ width: '95%', margin: 'auto' }}>
 
-        <p className="font-weight-bold text-center text-decoration-underline"
-          style={{ fontSize: '18px' }}>
-          <strong>DNS Data Table</strong>
-        </p>
+        <div className="mb-4">
+          <p className="font-weight-bold text-center text-decoration-underline"
+            style={{ fontSize: '18px' }}>
+            <strong>DNS Data Table</strong>
+          </p>
 
-        <div className="table-responsive custom-scroll">
+
+          <InputGroup>
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-secondary" className="rounded-start" style={{ width: "115px", fontSize: "14px" }}>
+                {selectedOption || 'Select Type'}
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => handleDropdownSelect("")} style={{ fontSize: "12px", fontWeight: "600" }}>None</Dropdown.Item>
+                {items.map((item) => (
+                  <>
+                    <Dropdown.Item onClick={() => handleDropdownSelect(item)} style={{ fontSize: "12px", fontWeight: "600" }}>
+                      {item}
+                    </Dropdown.Item>
+                  </>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown>
+            <FormControl
+              placeholder={"Search Domain..."}
+              aria-label={"Search Domain..."}
+              value={search}
+              onChange={handleSearchChange}
+              // onChange={(e)=> setSearch(e.target.value)}
+              className="rounded-0"
+              style={{ fontSize: "14px" }}
+            />
+            <Button variant="outline-secondary" className="rounded-0" onClick={handleReset}>
+              <BsX />
+            </Button>
+            <Button variant="outline-secondary" className="rounded-end" style={{ borderLeft: '0' }}>
+              <BsSearch />
+            </Button>
+          </InputGroup>
+
+
+        </div>
+
+        <div className="table-responsive custom-scroll"
+          style={{ maxHeight: '600px', overflow: "auto" }}>
+
           <Table className="custom-table" >
             <thead className="thead-dark">
               <tr>
                 <th>S.No.</th>
                 <th>Domain</th>
-                <th>Record Type</th>
-                <th>Record Data</th>
+                <th style={{ minWidth: "110px" }}>Record Type</th>
+                <th style={{ minWidth: "110px" }}>Record Data</th>
                 <th>Action</th>
               </tr>
             </thead>
 
             <tbody>
 
-              {(records && records.length > 0) ?
+              {(records && records.length > 0) &&
                 <>
                   {records.map((record, index) => (
                     <>
                       <tr key={index}>
                         <td>{index + 1}</td>
                         <td title={record.domain} className="custom-line-style">{record.domain}</td>
-                        <td>{record.recordType}</td>
-                        <td title={record.recordData}>{record.recordData}</td>
+                        <td style={{ minWidth: "110px" }}>{record.recordType}</td>
+                        <td style={{ minWidth: "110px" }} title={record.recordData}>{record.recordData}</td>
                         <td className="d-flex gap-2 ">
                           <Button variant="primary"
                             onClick={() => {
@@ -566,14 +652,16 @@ const Dashboard = () => {
                   ))}
 
                 </>
-                :
-                <>
-                  <p>No Record</p>
-                </>
               }
-
             </tbody>
           </Table>
+
+          {(records && records.length === 0) &&
+            <p className="mx-auto text-center"
+              style={{ fontWeight: "600", width: "100%" }}>
+              No DNS Record
+            </p>
+          }
         </div>
       </div>
 

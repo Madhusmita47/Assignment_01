@@ -26,7 +26,7 @@ app.post('/dns/record', validateRecordType, async (req, res) => {
 
     try {
         const newRecord = await DnsRecord.create({ domain, recordType, recordData });
-        res.status(201).json({ success: true, data: newRecord });
+        res.status(201).json({ success: true, message: "Record Added Successfully", data: newRecord });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
@@ -45,9 +45,14 @@ app.get('/dns/records/:domain', async (req, res) => {
 });
 // get all data---------------------------------
 app.get('/dns/getallrecords', async (req, res) => {
+    const { domain, recordType } = req.query;
 
     try {
-        const records = await DnsRecord.find({});
+        let query = {};
+        if (domain) query.domain = { $regex: domain, $options: 'i' };
+        if (recordType) query.recordType = recordType;
+
+        const records = await DnsRecord.find(query).sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: records });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -61,7 +66,7 @@ app.put('/dns/record/:id', validateRecordType, async (req, res) => {
 
     try {
         const updatedRecord = await DnsRecord.findByIdAndUpdate(id, { domain, recordType, recordData }, { new: true });
-        res.status(200).json({ success: true, data: updatedRecord });
+        res.status(200).json({ success: true, message: "Record Updated Successfully", data: updatedRecord });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
@@ -112,10 +117,12 @@ app.post('/fileupload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ success: false, message: "No file uploaded" });
         }
         const file = req.file.path;
-        console.log("file", file)
+
         const userData = [];
+        let getError = [];
         let error = []
-        fs.createReadStream(req.file.path)
+
+        fs.createReadStream(file)
             .on('error', (err) => {
                 console.error("Error reading file:", err);
                 res.status(500).json({ success: false, message: "Error reading file" });
@@ -123,26 +130,34 @@ app.post('/fileupload', upload.single('file'), async (req, res) => {
             .pipe(csv())
             .on('data', (row) => {
                 // Process each row of the CSV file
-                // Example: Validate, format, and push to userData array
                 if (!allowedRecordTypes.includes(row.recordType)) {
+                    getError.push('error');
                     error.push(row);
-                    //  continue;
+                } else {
+                    getError.push(row);
+                    userData.push({
+                        domain: row.domain,
+                        recordType: row.recordType,
+                        recordData: row.recordData
+                    });
                 }
-                // console.log("error", error)
 
-                userData.push({
-                    domain: row.domain,
-                    recordType: row.recordType,
-                    recordData: row.recordData
-                });
             })
 
             .on('end', async () => {
+            
+                const errorIndices = getError.reduce((acc, currentValue, index) => {
+                    if (currentValue === 'error') {
+                        acc.push(index + 2);
+                    }
+                    return acc;
+                }, []);
+
                 // Insert userData into the database after processing all rows
                 try {
                     await DnsRecord.insertMany(userData);
                     if (error.length > 0) {
-                        return res.status(400).send({ status: true, message: "Some error found in csv file" });
+                        return res.status(400).send({ status: true, message: `Some error found in csv file. Please check these rows : "${errorIndices.join(", ")}"` });
                     } else {
                         return res.status(200).send({ status: true, message: "CSV imported successfully" });
                     }
@@ -164,16 +179,16 @@ app.post('/fileupload', upload.single('file'), async (req, res) => {
 app.get('/aggregatedata', async (req, res) => {
 
     try {
-        const aggregaterecordscounts = await DnsRecord.aggregate([{ $group: { _id: "$recordType", total_count: { $sum: 1 } } }])
+        const aggregaterecordscounts = await DnsRecord.aggregate([{ $group: { _id: "$recordType", total_count: { $sum: 1 } } }, { $sort: { _id: 1 } }])
 
         const totalCount = aggregaterecordscounts.reduce((acc, curr) => acc + curr.total_count, 0);
-      
+
         const totalpercentage = aggregaterecordscounts.map(record => ({
             _id: record._id,
             total_count: record.total_count,
             percentage: ((record.total_count / totalCount) * 100).toFixed(2)
         }));
-      
+
         res.status(200).json({ success: true, count: aggregaterecordscounts, percentage: totalpercentage });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
